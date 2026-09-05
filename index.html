@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>請款單</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+  :root{
+    --chrome:#EFEDE8;          /* 紙外的工作區底色 */
+    --chrome-ink:#3A3833;
+    --chrome-soft:#8A857B;
+    --paper:#FFFFFF;
+    --ink:#232527;
+    --ink-soft:#7A756C;
+    --accent:#2C5F63;
+    --accent-soft:#E8EFEE;
+    --line:#DDD8CE;
+    --line-soft:#ECE8E0;
+    --danger:#A8443A;
+    --sans:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+    --serif:"Noto Serif TC","Songti TC",serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --chrome:#1E1D1B; --chrome-ink:#E4E1DB; --chrome-soft:#8A857B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --chrome:#1E1D1B; --chrome-ink:#E4E1DB; --chrome-soft:#8A857B;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--chrome); color:var(--ink);
+    font-family:var(--sans); font-size:14px; line-height:1.55;
+    -webkit-text-size-adjust:100%;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+
+  /* ── 工具列（僅螢幕） ── */
+  .toolbar{
+    position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:12px 20px; background:var(--chrome); color:var(--chrome-ink);
+  }
+  .toolbar .brand{font-family:var(--serif); font-weight:700; font-size:16px; letter-spacing:.12em}
+  .toolbar .hint{color:var(--chrome-soft); font-size:12px; margin-right:8px}
+  .toolbar .actions{display:flex; align-items:center; gap:10px}
+  button{
+    font-family:var(--sans); font-size:16px; font-weight:500; cursor:pointer;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    padding:12px 20px; border-radius:8px; touch-action:manipulation;
+  }
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  button:disabled{opacity:.35; cursor:default}
+  .toolbar .actions{flex-wrap:wrap}
+  button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  /* ── 紙張 ── */
+  main{display:flex; flex-direction:column; align-items:center; gap:16px; padding:12px 16px 60px}
+  .sheet{
+    background:var(--paper); width:100%; max-width:210mm; min-height:270mm;
+    padding:18mm 16mm 14mm; box-shadow:0 2px 18px rgba(30,28,24,.18);
+    display:flex; flex-direction:column; gap:26px;
+  }
+
+  /* 可編輯欄位 */
+  [contenteditable]{outline:none; border-radius:2px; min-width:1em}
+  [contenteditable]:hover{background:var(--line-soft)}
+  [contenteditable]:focus{background:var(--accent-soft)}
+  [data-ph]:empty::before{content:attr(data-ph); color:var(--ink-soft); opacity:.55}
+
+  /* 表頭 */
+  .doc-head{display:flex; justify-content:space-between; align-items:flex-start; gap:24px;
+    border-bottom:2.5px solid var(--accent); padding-bottom:16px}
+  .issuer{flex:1; min-width:0}
+  .issuer .co{font-family:var(--serif); font-size:20px; font-weight:700; margin-bottom:6px}
+  .issuer .meta{display:flex; flex-direction:column; gap:2px; font-size:12.5px; color:var(--ink-soft)}
+  .issuer .meta span{display:inline-block}
+  .doc-title{text-align:right; flex-shrink:0}
+  .doc-title h1{font-family:var(--serif); font-size:30px; font-weight:700; margin:0;
+    letter-spacing:.3em; margin-right:-.3em; color:var(--accent)}
+  .doc-title .en{font-size:10.5px; letter-spacing:.28em; color:var(--ink-soft); margin-top:4px}
+
+  /* 對象與單據資訊 */
+  .parties{display:flex; justify-content:space-between; gap:24px}
+  .block-label{font-size:11px; letter-spacing:.18em; color:var(--accent); font-weight:700; margin-bottom:6px}
+  .bill-to{flex:1; min-width:0}
+  .bill-to .cl-name{font-size:16px; font-weight:700; margin-bottom:3px}
+  .bill-to .row{font-size:13px; color:var(--ink); display:flex; gap:6px}
+  .bill-to .cl-free{font-size:13px; white-space:pre-wrap; margin-bottom:4px}
+  .bill-to .row .k{color:var(--ink-soft); flex-shrink:0}
+  .doc-meta{flex-shrink:0; display:grid; grid-template-columns:auto auto; gap:3px 14px; align-content:start;
+    font-size:13px; font-variant-numeric:tabular-nums}
+  .doc-meta dt{color:var(--ink-soft)}
+  .doc-meta dd{margin:0; text-align:right; min-width:100px}
+
+  /* 品項表 */
+  table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums}
+  thead th{
+    font-size:12px; font-weight:700; letter-spacing:.1em; color:var(--accent);
+    border-top:1.5px solid var(--accent); border-bottom:1.5px solid var(--accent);
+    padding:8px 8px; text-align:left; white-space:nowrap;
+  }
+  th.num, td.num{text-align:right}
+  th.unit, td.unit{text-align:center}
+  tbody td{padding:9px 8px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  td.name{width:46%}
+  td.qty{width:10%}
+  td.unit{width:9%; color:var(--ink-soft)}
+  td.price-td{width:13%}
+  td.price-td .price-out{font-size:12px; color:var(--accent); white-space:nowrap}
+  td.price-td .price-out:empty{display:none}
+  td.price-td .price-out::before{content:'賣 '}
+  td.mk{width:92px; padding:6px 4px 0 0}
+  td.mk select{font-size:13px; padding:6px 6px; width:100%}
+  td.amount{width:15%; font-weight:500}
+  td.rm{width:3%; padding:6px 0 0 4px; border-bottom:1px solid var(--line-soft)}
+  td.dh{width:28px; color:var(--ink-soft); cursor:grab; touch-action:none;
+    font-size:17px; padding:9px 4px; user-select:none; -webkit-user-select:none}
+  tr.sortable-ghost{opacity:.4; background:var(--accent-soft)}
+  td.rm button{border:none; background:none; color:var(--ink-soft); font-size:20px; padding:6px 10px; line-height:1}
+  td.rm button:hover{color:var(--danger)}
+  .add-row{margin-top:8px; display:flex; gap:10px; flex-wrap:wrap}
+  .add-row button{border-style:dashed; color:var(--ink-soft); background:none; flex:1; min-width:200px}
+  .add-row button:hover{color:var(--accent); border-color:var(--accent)}
+  .scan-status{width:100%; text-align:center; color:var(--accent); font-size:14px; padding:6px 0}
+
+  /* 合計 */
+  .settle{display:flex; justify-content:space-between; gap:32px; align-items:flex-start}
+  .amount-words{flex:1; min-width:0; font-size:13px; padding-top:10px}
+  .amount-words .cn{font-family:var(--serif); font-size:15px; font-weight:600; margin-top:2px}
+  .totals{flex-shrink:0; min-width:270px}
+  .totals .trow{display:flex; justify-content:space-between; gap:24px; padding:7px 8px;
+    font-variant-numeric:tabular-nums; font-size:13.5px}
+  .totals .trow .tl{color:var(--ink-soft)}
+  .totals .grand{border-top:1.5px solid var(--accent); margin-top:4px; padding-top:10px;
+    font-size:16px; font-weight:700}
+  .totals .grand .tl{color:var(--ink); font-weight:700}
+  .totals .grand .tv{color:var(--accent)}
+  .tax-pick{padding:2px 8px 0}
+  select{font-family:var(--sans); font-size:15px; color:var(--ink-soft);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--paper); touch-action:manipulation}
+
+  /* 匯款與備註 */
+  .foot{display:flex; gap:32px; border-top:1px solid var(--line); padding-top:16px; margin-top:auto}
+  .pay-info{flex-shrink:0; min-width:250px}
+  .pay-info .row{display:flex; gap:8px; font-size:13px; margin-bottom:2px}
+  .pay-info .row .k{color:var(--ink-soft); flex-shrink:0}
+  .note-box{flex:1; min-width:0}
+  .note-box .note{font-size:13px; color:var(--ink); min-height:3em; white-space:pre-wrap}
+
+  /* 已開立請款單留存（僅螢幕，不列印） */
+  .photo-keep{width:100%; max-width:210mm; background:var(--paper);
+    border-radius:10px; padding:16px 20px; box-shadow:0 2px 10px rgba(30,28,24,.12)}
+  .pk-head{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .pk-title{font-weight:700; font-size:15px}
+  .pk-sub{color:var(--ink-soft); font-size:13px; flex:1; min-width:180px}
+  .pk-archive{margin-top:12px; display:flex; flex-direction:column; gap:8px}
+  .pk-file{display:flex; align-items:center; gap:10px;
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px}
+  .pk-file .fn{flex:1; min-width:0; overflow-wrap:anywhere; font-size:14px}
+  .pk-file .fs{color:var(--ink-soft); font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .pk-file button{padding:8px 14px; font-size:14px}
+  .pk-empty{color:var(--ink-soft); font-size:13px; margin-top:10px}
+  .undo-toast{position:fixed; left:50%; transform:translateX(-50%); bottom:24px; z-index:60;
+    background:#2A2825; color:#fff; border-radius:10px; padding:12px 16px;
+    display:flex; gap:14px; align-items:center; font-size:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,.3); max-width:90vw}
+  .undo-toast[hidden]{display:none}
+  .undo-toast span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .undo-toast button{background:var(--accent); border-color:var(--accent); color:#fff; padding:8px 18px}
+
+  /* ── 列印 ── */
+  @page{size:A4; margin:12mm}
+  @media print{
+    body{background:#fff}
+    .toolbar,.no-print{display:none!important}
+    main{padding:0}
+    .sheet{box-shadow:none; max-width:none; min-height:0; padding:6mm 4mm}
+    [contenteditable]:hover{background:none}
+    [data-ph]:empty::before{content:""}
+    tbody td{border-bottom-color:#E5E1D8}
+    tr.has-markup .price{display:none}
+    tr.has-markup .price-out{font-size:inherit; color:inherit}
+    td.price-td .price-out::before{content:''}
+  }
+  @media (max-width:640px){
+    .sheet{padding:24px 18px; min-height:0}
+    .doc-head,.parties,.settle,.foot{flex-direction:column; gap:16px}
+    .doc-title{text-align:left}
+    .totals{min-width:0; width:100%}
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="brand">請款單</div>
+  <div class="actions">
+    <span class="hint" id="saveHint">內容會自動即時儲存</span>
+    <button id="histUndoBtn" disabled>↩ 回上一步</button>
+    <button id="histRedoBtn" disabled>↪ 回下一步</button>
+    <button id="newBtn">開新的一張</button>
+    <button id="printBtn" class="primary">轉出 PDF</button>
+  </div>
+</div>
+
+<main>
+<section class="sheet">
+
+  <header class="doc-head">
+    <div class="issuer">
+      <div class="co" contenteditable data-ph="你的公司名稱" data-f="coName" data-keep></div>
+      <div class="meta">
+        <span contenteditable data-ph="聯絡人" data-f="coTax" data-keep></span>
+        <span contenteditable data-ph="聯絡電話" data-f="coPhone" data-keep></span>
+      </div>
+    </div>
+    <div class="doc-title">
+      <h1>請款單</h1>
+      <div class="en">PAYMENT REQUEST</div>
+    </div>
+  </header>
+
+  <div class="parties">
+    <div class="bill-to">
+      <div class="block-label">案場</div>
+      <div class="cl-name" contenteditable data-ph="案場名稱／工程名稱" data-f="clName"></div>
+      <div class="cl-free" contenteditable data-ph="客戶、地址、電話⋯需要什麼寫什麼，一行一項" data-f="clInfo"></div>
+    </div>
+  </div>
+
+  <div>
+    <table>
+      <thead><tr>
+        <th class="no-print"></th>
+        <th>品項／說明</th><th class="num">數量</th><th class="unit">單位</th>
+        <th class="num">單價</th><th class="no-print">加價</th><th class="num">金額</th><th class="no-print"></th>
+      </tr></thead>
+      <tbody id="items"></tbody>
+    </table>
+    <div class="add-row no-print">
+      <button id="addBtn">＋ 新增品項</button>
+      <button id="scanBtn" hidden>📷 掃描單據帶入品項</button>
+      <input type="file" id="scanInput" accept="image/*,.pdf" hidden>
+      <div class="scan-status" id="scanStatus" hidden>辨識中，請稍等幾秒⋯</div>
+    </div>
+  </div>
+
+  <div class="settle">
+    <div class="amount-words">
+      <div class="block-label">總計金額（大寫）</div>
+      <div class="cn" id="cnAmount">新臺幣零元整</div>
+    </div>
+    <div class="totals">
+      <div class="trow" id="rowSub"><span class="tl">小計</span><span class="tv" id="tSub">0</span></div>
+      <div class="trow" id="rowTax"><span class="tl" id="taxLabel">營業稅 5%</span><span class="tv" id="tTax">0</span></div>
+      <div class="trow grand"><span class="tl">總計 NT$</span><span class="tv" id="tTotal">0</span></div>
+      <div class="tax-pick no-print">
+        <select id="taxMode">
+          <option value="none">不另計稅（總計＝品項合計）</option>
+          <option value="add">外加 5% 營業稅</option>
+          <option value="incl">金額已含稅（列出內含稅額）</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="pay-info">
+      <div class="block-label">匯款資訊</div>
+      <div class="row"><span class="k">銀行</span><span contenteditable data-ph="銀行／分行（含代碼）" data-f="bankName" data-keep></span></div>
+      <div class="row"><span class="k">帳號</span><span contenteditable data-ph="帳號" data-f="bankAcct" data-keep></span></div>
+      <div class="row"><span class="k">戶名</span><span contenteditable data-ph="戶名" data-f="bankHolder" data-keep></span></div>
+    </div>
+    <div class="note-box">
+      <div class="block-label">備註</div>
+      <div class="note" contenteditable data-ph="例：請於付款後告知末五碼；本單開立後如需修改請聯繫窗口。" data-f="note"></div>
+    </div>
+  </div>
+
+</section>
+
+<section class="photo-keep no-print">
+  <div class="pk-head">
+    <div class="pk-title">已開立的請款單</div>
+    <div class="pk-sub">每次按「轉出 PDF」會自動存一份，保留 60 天；按「叫回」可以重看、重印</div>
+  </div>
+  <div class="pk-archive" id="archiveList"></div>
+</section>
+</main>
+
+<div class="undo-toast no-print" id="undoToast" hidden>
+  <span id="undoText"></span>
+  <button id="undoBtn">復原</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script>
+(function(){
+  var KEY = 'megops-invoice-v1';
+  var $ = function(s, r){ return (r||document).querySelector(s); };
+  var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+  var itemsBody = $('#items');
+
+  function parseNum(t){
+    var n = parseFloat(String(t||'').replace(/[,，\s]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
+  function fmt(n){
+    var hasDec = Math.abs(n - Math.round(n)) > 1e-9;
+    return n.toLocaleString('en-US', { minimumFractionDigits: hasDec ? 2 : 0, maximumFractionDigits: 2 });
+  }
+
+  function numToCN(n){
+    n = Math.round(n);
+    if (n <= 0) return '新臺幣零元整';
+    var D = '零壹貳參肆伍陸柒捌玖';
+    var U = ['','拾','佰','仟'];
+    var G = ['','萬','億','兆'];
+    var groups = [];
+    var x = n;
+    while (x > 0){ groups.unshift(x % 10000); x = Math.floor(x / 10000); }
+    var out = '';
+    for (var idx = 0; idx < groups.length; idx++){
+      var g = groups[idx], gi = groups.length - 1 - idx;
+      if (g === 0) continue;
+      if (out && g < 1000) out += '零';
+      var s = '', y = g, i = 0;
+      while (y > 0){
+        var d = y % 10;
+        if (d === 0){ if (s && s.charAt(0) !== '零') s = '零' + s; }
+        else s = D.charAt(d) + U[i] + s;
+        y = Math.floor(y / 10); i++;
+      }
+      out += s + G[gi];
+    }
+    return '新臺幣' + out + '元整';
+  }
+
+  function makeRow(data){
+    data = data || {};
+    var tr = document.createElement('tr');
+    tr.className = 'item';
+    tr.innerHTML =
+      '<td class="dh no-print" title="按住拖曳調整順序">⠿</td>' +
+      '<td class="name" contenteditable data-ph="品項／說明"></td>' +
+      '<td class="num qty" contenteditable data-ph="1"></td>' +
+      '<td class="unit" contenteditable data-ph="式"></td>' +
+      '<td class="num price-td"><div class="price" contenteditable data-ph="0"></div><div class="price-out"></div></td>' +
+      '<td class="mk no-print"><select class="mkSel">' +
+        '<option value="0">不加價</option><option value="0.1">加一成</option><option value="0.2">加兩成</option>' +
+        '<option value="0.3">加三成</option><option value="0.4">加四成</option><option value="0.5">加五成</option>' +
+      '</select></td>' +
+      '<td class="num amount">—</td>' +
+      '<td class="rm no-print"><button title="刪除此列" aria-label="刪除此列">×</button></td>';
+    $('.name', tr).textContent = data.name || '';
+    $('.qty', tr).textContent = data.qty || '';
+    $('.unit', tr).textContent = data.unit || '';
+    $('.price', tr).textContent = data.price || '';
+    $('.mkSel', tr).value = data.markup || '0';
+    $('.mkSel', tr).addEventListener('change', recalc);
+    $('.rm button', tr).addEventListener('click', function(){
+      pushHistory(true); /* 先把刪除前的狀態存進歷史 */
+      var name = $('.name', tr).textContent.trim();
+      var hadContent = name || $('.price', tr).textContent.trim();
+      tr.remove();
+      if (!itemsBody.children.length) itemsBody.appendChild(makeRow());
+      recalc();
+      pushHistory(true);
+      if (hadContent) showUndoToast(name);
+    });
+    return tr;
+  }
+
+  function rowCalc(tr){
+    var qtyText = $('.qty', tr).textContent.trim();
+    var qty = qtyText === '' ? 1 : parseNum(qtyText);
+    var cost = parseNum($('.price', tr).textContent);
+    var m = parseFloat($('.mkSel', tr).value) || 0;
+    var final = Math.round(cost * (1 + m));
+    return { m: m, final: final, amount: qty * final };
+  }
+
+  function recalc(){
+    var sub = 0;
+    $$('.item', itemsBody).forEach(function(tr){
+      var rc = rowCalc(tr);
+      sub += rc.amount;
+      tr.classList.toggle('has-markup', rc.m > 0);
+      $('.price-out', tr).textContent = rc.m > 0 ? fmt(rc.final) : '';
+      var hasContent = $('.name', tr).textContent.trim() || $('.price', tr).textContent.trim();
+      $('.amount', tr).textContent = hasContent ? fmt(rc.amount) : '—';
+    });
+    var mode = $('#taxMode').value, tax = 0, total = sub;
+    if (mode === 'add'){ tax = Math.round(sub * 0.05); total = sub + tax; }
+    if (mode === 'incl'){ tax = Math.round(sub - sub / 1.05); total = sub; }
+    $('#rowSub').style.display = mode === 'none' ? 'none' : '';
+    $('#rowTax').style.display = mode === 'none' ? 'none' : '';
+    $('#taxLabel').textContent = mode === 'incl' ? '內含營業稅' : '營業稅 5%';
+    $('#tSub').textContent = fmt(sub);
+    $('#tTax').textContent = fmt(tax);
+    $('#tTotal').textContent = fmt(total);
+    $('#cnAmount').textContent = numToCN(total);
+    save();
+    pushHistory();
+  }
+
+  function collect(){
+    var fields = {};
+    $$('[data-f]').forEach(function(el){ fields[el.dataset.f] = el.textContent; });
+    var items = $$('.item', itemsBody).map(function(tr){
+      return {
+        name: $('.name', tr).textContent,
+        qty: $('.qty', tr).textContent,
+        unit: $('.unit', tr).textContent,
+        price: $('.price', tr).textContent,
+        markup: $('.mkSel', tr).value
+      };
+    });
+    return { fields: fields, items: items, taxMode: $('#taxMode').value };
+  }
+
+  var saveTimer;
+  function markSaved(){
+    var h = $('#saveHint');
+    if (h) h.textContent = '已自動儲存 ✓';
+  }
+  function saveNow(){
+    clearTimeout(saveTimer);
+    try { localStorage.setItem(KEY, JSON.stringify(collect())); markSaved(); } catch(e){}
+  }
+  window.addEventListener('pagehide', saveNow);
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'hidden') saveNow();
+  });
+  function save(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      try { localStorage.setItem(KEY, JSON.stringify(collect())); markSaved(); }
+      catch(e){}
+    }, 300);
+  }
+
+  /* 掃描單據 → AI 辨識帶入品項（透過 Apps Script 中繼站） */
+  var SCAN_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyzvb8Hyo0exJIpVOEqTna0CEU2NWVBkN536_fTAXIJxzI8QQF6XrwOW51xY4RPtueQ/exec';
+  if (SCAN_ENDPOINT) $('#scanBtn').hidden = false;
+  function fileToPayload(f, cb){
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)){
+      var r = new FileReader();
+      r.onload = function(){
+        cb({ mimeType: 'application/pdf', data: r.result.split(',')[1] });
+      };
+      r.readAsDataURL(f);
+      return;
+    }
+    var url = URL.createObjectURL(f);
+    var img = new Image();
+    img.onload = function(){
+      var max = 1280;
+      var sc = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.width * sc);
+      c.height = Math.round(img.height * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      cb({ mimeType: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.8).split(',')[1] });
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
+  }
+  function runScan(f){
+    $('#scanBtn').disabled = true;
+    $('#scanStatus').hidden = false;
+    fileToPayload(f, function(payload){
+      if (!payload){ scanDone(); alert('這個檔案讀不進來，請改用照片或 PDF。'); return; }
+      var attempt = 0;
+      function callScan(){
+        attempt++;
+        fetch(SCAN_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ files: [payload] })
+        }).then(function(r){ return r.json(); }).then(function(res){
+          /* AI 塞車（503）自動重試，最多三次 */
+          if (!res.ok && res.error && /503|UNAVAILABLE|overloaded/i.test(res.error) && attempt < 3){
+            $('#scanStatus').textContent = 'AI 現在有點塞車，自動再試一次（第 ' + (attempt + 1) + ' 次）⋯';
+            setTimeout(callScan, 2500);
+            return;
+          }
+          handleScanResult(res);
+        }).catch(function(){
+          scanDone();
+          alert('連不上辨識服務，請確認網路後再試。');
+        });
+      }
+      callScan();
+    });
+  }
+  function handleScanResult(res){
+        scanDone();
+        $('#scanStatus').textContent = '辨識中，請稍等幾秒⋯';
+        if (!res.ok || !res.items || !res.items.length){
+          alert(res.error ? ('辨識失敗：' + res.error) : '沒有讀到品項，請拍清楚一點再試一次。');
+          return;
+        }
+        pushHistory(true); /* 帶入前的狀態先入歷史，可一鍵退回 */
+        /* 若表上只剩空白列，先清掉再帶入 */
+        $$('.item', itemsBody).forEach(function(tr){
+          var empty = !$('.name', tr).textContent.trim() && !$('.price', tr).textContent.trim();
+          if (empty) tr.remove();
+        });
+        res.items.forEach(function(it){
+          itemsBody.appendChild(makeRow({
+            name: String(it.name || ''), qty: String(it.qty || ''),
+            unit: String(it.unit || ''), price: String(it.price || '')
+          }));
+        });
+        recalc();
+        pushHistory(true);
+        alert('帶入 ' + res.items.length + ' 個品項。金額請務必核對一次，AI 讀手寫字可能看錯。');
+  }
+  function scanDone(){
+    $('#scanBtn').disabled = false;
+    $('#scanStatus').hidden = true;
+  }
+  $('#scanBtn').addEventListener('click', function(){ $('#scanInput').click(); });
+  $('#scanInput').addEventListener('change', function(){
+    if (this.files[0]) runScan(this.files[0]);
+    this.value = '';
+  });
+
+  /* 已開立的請款單（存 60 天，可叫回） */
+  var AKEY = 'invoice-archive-v1';
+  function loadArchive(){
+    try { return JSON.parse(localStorage.getItem(AKEY)) || []; } catch(e){ return []; }
+  }
+  function saveArchive(list){
+    try { localStorage.setItem(AKEY, JSON.stringify(list)); } catch(e){}
+  }
+  function pruneArchive(list){
+    var cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    return list.filter(function(r){ return r.ts >= cutoff; });
+  }
+  function archiveCurrent(){
+    var list = pruneArchive(loadArchive());
+    var snap = snapState();
+    if (!(list.length && list[list.length - 1].snap === snap)){
+      list.push({
+        ts: Date.now(),
+        site: $('[data-f="clName"]').textContent.trim() || '未填案場',
+        total: $('#tTotal').textContent,
+        snap: snap
+      });
+      if (list.length > 100) list.shift();
+    }
+    saveArchive(list);
+    renderArchive();
+  }
+  function renderArchive(){
+    var list = pruneArchive(loadArchive());
+    saveArchive(list);
+    var box = $('#archiveList');
+    box.innerHTML = '';
+    if (!list.length){
+      box.innerHTML = '<div class="pk-empty">還沒有紀錄。按過「轉出 PDF」的請款單會自動存在這裡。</div>';
+      return;
+    }
+    list.slice().reverse().forEach(function(r){
+      var row = document.createElement('div');
+      row.className = 'pk-file';
+      var d = new Date(r.ts);
+      var mm = String(d.getMinutes()).padStart(2, '0');
+      var fn = document.createElement('span');
+      fn.className = 'fn';
+      fn.textContent = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + mm + '　' + r.site;
+      var fs = document.createElement('span');
+      fs.className = 'fs'; fs.textContent = 'NT$ ' + r.total;
+      var back = document.createElement('button');
+      back.textContent = '叫回';
+      back.addEventListener('click', function(){
+        if (!confirm('把這張（' + r.site + '）叫回到畫面上？目前畫面的內容會被換掉，按「回上一步」可以回來。')) return;
+        pushHistory(true);
+        applyState(r.snap);
+        pushHistory(true);
+        window.scrollTo(0, 0);
+      });
+      var del = document.createElement('button');
+      del.textContent = '刪除';
+      del.addEventListener('click', function(){
+        if (!confirm('刪除這筆紀錄（' + r.site + '）？')) return;
+        saveArchive(loadArchive().filter(function(x){ return x.ts !== r.ts; }));
+        renderArchive();
+      });
+      row.appendChild(fn); row.appendChild(fs);
+      row.appendChild(back); row.appendChild(del);
+      box.appendChild(row);
+    });
+  }
+
+  function load(){
+    var draft = null;
+    try { draft = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
+    if (draft && draft.fields){
+      Object.keys(draft.fields).forEach(function(k){
+        var el = $('[data-f="' + k + '"]');
+        if (el) el.textContent = draft.fields[k];
+      });
+      (draft.items && draft.items.length ? draft.items : [{}]).forEach(function(it){
+        itemsBody.appendChild(makeRow(it));
+      });
+      $('#taxMode').value = draft.taxMode || 'none';
+    } else {
+      itemsBody.appendChild(makeRow());
+    }
+  }
+
+  function newInvoice(){
+    if (!confirm('開新的一張？會清空案場與品項，公司與匯款資訊會保留。')) return;
+    pushHistory(true);
+    $$('[data-f]').forEach(function(el){
+      if (!el.hasAttribute('data-keep')) el.textContent = '';
+    });
+    itemsBody.innerHTML = '';
+    itemsBody.appendChild(makeRow());
+    recalc();
+    pushHistory(true);
+  }
+
+  $('#addBtn').addEventListener('click', function(){
+    var tr = makeRow();
+    itemsBody.appendChild(tr);
+    $('.name', tr).focus();
+    save();
+  });
+  /* 回上一步／回下一步（快照式歷史，含誤刪復原） */
+  var hist = [], hIdx = -1, restoring = false, histTimer, undoTimer;
+  function snapState(){
+    var c = collect();
+    return JSON.stringify({ fields: c.fields, items: c.items, taxMode: c.taxMode });
+  }
+  function commitHistory(){
+    var s = snapState();
+    if (hist[hIdx] === s) return;
+    hist = hist.slice(0, hIdx + 1);
+    hist.push(s);
+    if (hist.length > 60) hist.shift();
+    hIdx = hist.length - 1;
+    updateHistBtns();
+  }
+  function pushHistory(immediate){
+    if (restoring) return;
+    clearTimeout(histTimer);
+    if (immediate) commitHistory();
+    else histTimer = setTimeout(commitHistory, 600);
+  }
+  function applyState(json){
+    restoring = true;
+    var st = JSON.parse(json);
+    $$('[data-f]').forEach(function(el){ el.textContent = st.fields[el.dataset.f] || ''; });
+    itemsBody.innerHTML = '';
+    (st.items && st.items.length ? st.items : [{}]).forEach(function(it){
+      itemsBody.appendChild(makeRow(it));
+    });
+    $('#taxMode').value = st.taxMode || 'none';
+    recalc();
+    restoring = false;
+    updateHistBtns();
+  }
+  function histUndo(){
+    pushHistory(true);
+    if (hIdx > 0){ hIdx--; applyState(hist[hIdx]); }
+    clearTimeout(undoTimer);
+    $('#undoToast').hidden = true;
+  }
+  function histRedo(){
+    if (hIdx < hist.length - 1){ hIdx++; applyState(hist[hIdx]); }
+  }
+  function updateHistBtns(){
+    $('#histUndoBtn').disabled = hIdx <= 0;
+    $('#histRedoBtn').disabled = hIdx >= hist.length - 1;
+  }
+  function showUndoToast(name){
+    $('#undoText').textContent = '已刪除「' + (name || '未命名品項') + '」';
+    $('#undoToast').hidden = false;
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(function(){ $('#undoToast').hidden = true; }, 15000);
+  }
+  $('#undoBtn').addEventListener('click', histUndo);
+  $('#histUndoBtn').addEventListener('click', histUndo);
+  $('#histRedoBtn').addEventListener('click', histRedo);
+
+  $('#newBtn').addEventListener('click', newInvoice);
+  if (window.Sortable){
+    new Sortable(itemsBody, {
+      handle: '.dh', animation: 150,
+      onStart: function(){ pushHistory(true); },
+      onEnd: function(){ recalc(); pushHistory(true); }
+    });
+  }
+  $('#printBtn').addEventListener('click', function(){
+    saveNow();
+    archiveCurrent();
+    window.print();
+  });
+  $('#taxMode').addEventListener('change', recalc);
+  document.addEventListener('input', recalc);
+
+  /* 貼上時只留純文字，避免把別處的格式帶進單子 */
+  document.addEventListener('paste', function(e){
+    var el = e.target.closest && e.target.closest('[contenteditable]');
+    if (!el) return;
+    e.preventDefault();
+    var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, text);
+  });
+
+  load();
+  renderArchive();
+  recalc();
+})();
+</script>
+</body>
+</html>

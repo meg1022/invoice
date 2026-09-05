@@ -1,0 +1,74 @@
+/**
+ * 請款單掃描中繼站（Google Apps Script）
+ * 收到網頁傳來的單據照片/PDF → 呼叫 Gemini 辨識 → 回傳品項 JSON
+ * 金鑰放在「指令碼屬性」GEMINI_API_KEY，不會出現在程式碼或網頁裡
+ */
+
+/* 依序嘗試：第一個塞車（503/429）就馬上換下一個 */
+var MODELS = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'];
+
+var PROMPT =
+  '你會收到一張估價單、請款單或收據的照片或 PDF（可能是手寫）。' +
+  '把所有品項逐列抓出來，只輸出 JSON，格式：' +
+  '{"items":[{"name":"品名","qty":"數量","unit":"單位","price":"單價"}]}。' +
+  '規則：' +
+  '1. name 放品名，規格或備註用括號附在後面；' +
+  '2. qty 只放數字；unit 放台、式、個這類單位，沒有就留空字串；' +
+  '3. price 放單價的數字（不加逗號）。如果單子上只有總額沒有單價，單價＝總額除以數量（取整數）；' +
+  '4. 手寫看不清楚的字，在該字位置用？代替；' +
+  '5. 與品項無關的文字（店章、日期、簽名、備註說明）不要放進 items；' +
+  '6. 只輸出 JSON，不要任何其他文字。';
+
+function doPost(e) {
+  try {
+    var key = (PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '').trim();
+    if (!key) return out({ ok: false, error: '中繼站還沒設定金鑰' });
+
+    var req = JSON.parse(e.postData.contents);
+    var parts = [{ text: PROMPT }];
+    (req.files || []).forEach(function (f) {
+      parts.push({ inlineData: { mimeType: f.mimeType, data: f.data } });
+    });
+
+    var payload = JSON.stringify({
+      contents: [{ role: 'user', parts: parts }],
+      generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+    });
+
+    var resp = null, code = 0;
+    for (var mi = 0; mi < MODELS.length; mi++) {
+      resp = UrlFetchApp.fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[mi] + ':generateContent',
+        {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { 'x-goog-api-key': key },
+          payload: payload,
+          muteHttpExceptions: true
+        }
+      );
+      code = resp.getResponseCode();
+      if (code === 200) break;
+      if (code !== 503 && code !== 429) break; /* 塞車以外的錯誤，換模型也沒用 */
+    }
+
+    if (code !== 200) {
+      return out({
+        ok: false,
+        error: 'v3｜AI 服務回應 ' + code + '｜' + resp.getContentText().slice(0, 300)
+      });
+    }
+    var data = JSON.parse(resp.getContentText());
+    var text = data.candidates[0].content.parts[0].text;
+    var parsed = JSON.parse(text);
+    return out({ ok: true, items: parsed.items || [] });
+  } catch (err) {
+    return out({ ok: false, error: 'v3｜' + String(err) });
+  }
+}
+
+function out(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
