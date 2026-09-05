@@ -4,8 +4,8 @@
  * 金鑰放在「指令碼屬性」GEMINI_API_KEY，不會出現在程式碼或網頁裡
  */
 
-/* 依序嘗試：第一個塞車（503/429）就馬上換下一個 */
-var MODELS = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'];
+/* 預設模型清單；網頁端可在請求裡帶 models 覆蓋（之後調整模型不用再改這支程式） */
+var DEFAULT_MODELS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
 
 var PROMPT =
   '你會收到一張估價單、請款單或收據的照片或 PDF（可能是手寫）。' +
@@ -25,6 +25,10 @@ function doPost(e) {
     if (!key) return out({ ok: false, error: '中繼站還沒設定金鑰' });
 
     var req = JSON.parse(e.postData.contents);
+    var MODELS = (req.models || []).filter(function(m){
+      return /^[A-Za-z0-9.\-]+$/.test(String(m));
+    }).slice(0, 5);
+    if (!MODELS.length) MODELS = DEFAULT_MODELS;
     var parts = [{ text: PROMPT }];
     (req.files || []).forEach(function (f) {
       parts.push({ inlineData: { mimeType: f.mimeType, data: f.data } });
@@ -55,7 +59,7 @@ function doPost(e) {
     if (code !== 200) {
       return out({
         ok: false,
-        error: 'v3｜AI 服務回應 ' + code + '｜' + resp.getContentText().slice(0, 300)
+        error: 'v4｜AI 服務回應 ' + code + '｜' + resp.getContentText().slice(0, 300)
       });
     }
     var data = JSON.parse(resp.getContentText());
@@ -63,7 +67,7 @@ function doPost(e) {
     var parsed = JSON.parse(text);
     return out({ ok: true, items: parsed.items || [] });
   } catch (err) {
-    return out({ ok: false, error: 'v3｜' + String(err) });
+    return out({ ok: false, error: 'v4｜' + String(err) });
   }
 }
 

@@ -447,6 +447,8 @@
 
   /* 掃描單據 → AI 辨識帶入品項（透過 Apps Script 中繼站） */
   var SCAN_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyzvb8Hyo0exJIpVOEqTna0CEU2NWVBkN536_fTAXIJxzI8QQF6XrwOW51xY4RPtueQ/exec';
+  /* 模型優先序（2026-09-05 實測：3.5-flash 通、flash-latest 塞、2.5 系列對新金鑰已 404）*/
+  var SCAN_MODELS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
   if (SCAN_ENDPOINT) $('#scanBtn').hidden = false;
   function fileToPayload(f, cb){
     if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)){
@@ -483,7 +485,7 @@
         fetch(SCAN_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ files: [payload] })
+          body: JSON.stringify({ files: [payload], models: SCAN_MODELS })
         }).then(function(r){ return r.json(); }).then(function(res){
           /* AI 塞車（503）自動重試，最多三次 */
           if (!res.ok && res.error && /503|UNAVAILABLE|overloaded/i.test(res.error) && attempt < 3){
